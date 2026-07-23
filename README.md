@@ -9,12 +9,16 @@ Le produit sépare explicitement deux activités :
 
 ## Principes directeurs
 
-- organisation hiérarchique des suites et des tests ;
+- organisation hiérarchique des jeux de tests, suites et tests ;
+- types de tests configurables, dont les tests fonctionnels de performance ;
+- saisie guidée adaptée aux fonctionnels métier, sans YAML obligatoire ;
+- modèles de tests, phrases d’intention et tags administrables ;
 - description synthétique et factuelle mise à jour lors de l’édition d’un test ;
 - validation individuelle des tests pendant leur conception ;
 - profils LLM de conception et d’exécution distincts ;
 - tests exécutables sans LLM dans le cas nominal ;
 - génération de code Playwright lisible, déterministe et personnalisable ;
+- historisation des réussites, durées et dates d’exécution ;
 - utilisation de sélecteurs stables plutôt que de coordonnées visuelles fragiles ;
 - séparation stricte entre secrets, spécifications, preuves et code généré ;
 - déploiement conteneurisé simple ;

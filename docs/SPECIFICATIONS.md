@@ -124,6 +124,50 @@ Projet
 
 Une suite ou un test possède un nom, un ordre d’affichage et un parent facultatif. Le déplacement d’un nœud ne doit pas changer l’identité ni l’historique du test. Une profondeur maximale raisonnable pourra être imposée par l’interface sans modifier le modèle conceptuel.
 
+### 3.4.1 Jeux de tests
+
+Un **jeu de tests** est un regroupement fonctionnel exécutable, distinct d’un simple dossier. Il possède un objectif, un périmètre, un type, une cible, une politique d’exécution et une arborescence de tests.
+
+La hiérarchie fonctionnelle est donc :
+
+```text
+Projet
+└── Jeu de tests
+    └── Suite ou dossier
+        └── Test
+```
+
+Un jeu de tests doit pouvoir être exporté, validé, exécuté et historisé indépendamment des autres jeux du projet.
+
+### 3.4.2 Types de tests
+
+Le type d’un test ou d’un jeu de tests est choisi dans une liste administrable. Le MVP fournit au minimum :
+
+- `smoke` : vérification rapide de disponibilité ;
+- `sanity` : vérification ciblée après une modification ;
+- `acceptance` : validation d’un comportement métier ;
+- `regression` : vérification de comportements existants ;
+- `e2e` : parcours complet de bout en bout ;
+- `performance` : vérification de durées, seuils et budgets sur un parcours fonctionnel.
+
+Le type `performance` ne désigne pas un test de charge ou de montée en charge. Les tests de charge restent hors périmètre du MVP. Un test `performance` doit déclarer les actions mesurées, les seuils attendus et les conditions de mesure.
+
+Le type du jeu de tests sert de valeur par défaut pour ses tests descendants. Un test peut déclarer un type différent lorsqu’il est compatible avec le jeu ; ce type explicite prévaut alors. Une incompatibilité est signalée à la saisie et bloque l’export jusqu’à correction.
+
+### 3.4.3 Cycle de vie
+
+Un test suit un cycle explicite :
+
+```text
+brouillon → en_conception → candidat → validé_individuellement → approuvé → actif → retiré → archivé
+```
+
+Les transitions autorisées sont : `brouillon → en_conception`, `en_conception → candidat`, `candidat → validé_individuellement`, `validé_individuellement → approuvé`, `approuvé → actif`, `actif → retiré` et `retiré → archivé`. Une modification d’un test approuvé ou actif crée un nouveau brouillon. Les retours en arrière implicites et les transitions qui sautent une validation sont refusés.
+
+Un test en brouillon, en conception, candidat ou retiré n’est pas sélectionnable par une CI. Un test candidat peut être lancé individuellement. Un test actif est autorisé dans les jeux de tests automatisés. Les transitions sont enregistrées dans un journal d’audit distinct de l’historique synthétique des résultats.
+
+Les transitions et leurs conditions doivent être visibles dans l’interface. L’utilisateur ne doit pas avoir à connaître les valeurs internes pour comprendre ce qui lui reste à faire.
+
 ### 3.5 Description synthétique et factuelle
 
 Chaque test possède une description courte destinée à la navigation, à la revue et aux rapports.
@@ -138,6 +182,82 @@ Lorsqu’un test est édité par la conversation ou par le formulaire structuré
 6. sa version est enregistrée avec la version du test.
 
 La conversation n’est pas la source de vérité. La représentation structurée du test et sa version approuvée le sont.
+
+### 3.5.1 Saisie guidée et assistance
+
+Les fonctionnels métier ne doivent pas avoir à écrire du YAML ou du code pour définir un test. La saisie principale se fait par formulaire guidé, choix de listes, texte libre et conversation. Le YAML et les autres formats structurés sont des formats d’administration, d’export et d’intégration, pas des formats de saisie attendus des utilisateurs métier.
+
+Tous les champs affichés doivent être documentés dans l’interface avec un libellé, une aide courte, un exemple, un indicateur obligatoire/facultatif, une règle de validation et l’origine de la valeur : utilisateur, configuration ou proposition du LLM.
+
+| Champ métier | Obligatoire | Saisie et exemple | Validation | Assistance LLM |
+|---|---:|---|---|---|
+| Nom du jeu de tests | oui | texte court, ex. « Parcours commande » | non vide, longueur limitée | suggestion facultative |
+| Objectif du jeu | oui | texte libre décrivant le périmètre | non vide | reformulation et questions de périmètre |
+| Nom du test | oui | texte court | non vide, unique dans son parent | suggestion à partir de l’objectif |
+| Type de test | oui | liste administrable | valeur configurée | suggestion justifiée |
+| Modèle de test | non | liste administrable | modèle disponible | sélection selon l’objectif |
+| `requirements` | non | références ou libellés courts | valeurs non vides | proposition de références |
+| `business_rules` | non | références ou libellés courts | valeurs non vides | proposition de règles |
+| Préconditions | oui si nécessaire | texte métier libre | confirmation requise si ambigu | traduction en dépendances candidates |
+| Données de test | non | tableau ou texte guidé | format du profil choisi | proposition de jeux de données |
+| Environnement cible | oui | liste administrable | environnement autorisé | suggestion selon le projet |
+| Profil de données | non | liste administrable | profil disponible | suggestion selon les préconditions |
+| Étapes | oui | phrases décrivant les actions | au moins une étape | structuration et code candidat |
+| Résultats attendus | oui | texte métier | au moins une assertion observable | reformulation en assertions |
+| Postconditions | non | texte métier | dépendances nettoyables | proposition de nettoyage |
+| Tags | non | choix dans une liste contrôlée | tag administré | suggestions |
+| Déclaration d’exécution CI | oui | choix `on_commit`, `nightly`, etc. | valeur autorisée | proposition selon le type |
+| Seuils de performance | obligatoire pour `performance` | durée ou budget | unité et seuil valides | proposition contextualisée |
+| Usage exceptionnel du LLM d’exécution | non | case à cocher et justification | justification obligatoire si activé | aide à la justification |
+
+Pour chaque champ, l’interface doit afficher le libellé, l’aide, l’exemple, le caractère obligatoire, la règle de validation et l’origine de la valeur. Ces informations sont elles-mêmes configurables par les administrateurs et sont testées avec le formulaire.
+
+Le LLM ne peut pas approuver seul une proposition. Toute valeur proposée doit être distinguée visuellement d’une valeur confirmée.
+
+### 3.5.2 Configuration administrable
+
+Les administrateurs de l’outillage peuvent adapter le vocabulaire et les guides sans modifier le code de l’application. Les fichiers de configuration peuvent définir :
+
+- les types de tests disponibles ;
+- les modèles de tests ;
+- les phrases décrivant les intentions fonctionnelles ;
+- les valeurs de tags autorisées ;
+- les environnements et profils de données disponibles ;
+- les aides, exemples et champs obligatoires par contexte.
+
+Chaque entrée de configuration possède un identifiant stable, un libellé visible, une description destinée au métier et, lorsque nécessaire, une représentation technique non visible dans le formulaire.
+
+Le MVP prévoit au minimum les fichiers administrables suivants :
+
+```text
+config/test-types.yaml          # types, libellés et aides
+config/test-models.yaml         # modèles de saisie et questions LLM
+config/test-intents.yaml         # phrases d’intention fonctionnelle
+config/tags.yaml                 # tags sélectionnables
+config/environments.yaml         # environnements, URLs et origines autorisées
+config/data-profiles.yaml        # profils de données et fixtures
+```
+
+Un modèle de test peut par exemple déclarer :
+
+```yaml
+id: create-record
+label: Créer une donnée
+help: Vérifie qu’un utilisateur peut créer une donnée et la retrouver.
+default_type: acceptance
+required_fields:
+  - objective
+  - preconditions_text
+  - expected_results
+llm_questions:
+  - Quel utilisateur réalise l’action ?
+  - Quelle donnée doit être créée ?
+  - Comment vérifier que la création est effective ?
+```
+
+Le contenu technique des fichiers peut évoluer sans changer les libellés ni le parcours de saisie métier.
+
+Le système doit vérifier la configuration au démarrage et signaler les identifiants en doublon, références inconnues ou champs incohérents.
 
 ### 3.6 Modèle d’exploration en conception
 
@@ -211,9 +331,23 @@ Il déploie l’outil, configure les secrets, fournit les runners et intègre le
 
 ## 6. Exigences fonctionnelles
 
+### 6.1 Conception et organisation des tests
+
+Cette partie décrit les fonctions utilisées par les fonctionnels métier pour définir, comprendre, organiser et valider un test. Elle ne lance pas directement le code dans le processus de l’application de conception.
+
 ### EF-001 — Gestion des projets
 
-Le système doit permettre de créer, consulter, modifier et archiver un projet contenant au minimum un nom, une description, une cible web et une politique de sécurité.
+Le système doit permettre de créer, consulter, modifier et archiver un projet contenant au minimum un nom, une description, une cible web et une politique de sécurité. Un projet peut contenir plusieurs jeux de tests indépendants.
+
+Un jeu de tests doit contenir au minimum :
+
+- un nom et un objectif ;
+- un type choisi dans la liste administrée ;
+- une description lisible par les métiers ;
+- une cible ou un profil d’environnement ;
+- une arborescence de tests ;
+- des tags ;
+- une déclaration d’exécution.
 
 ### EF-002 — Arborescence des tests
 
@@ -226,6 +360,10 @@ Le système doit permettre de :
 - filtrer les tests par nom, tag, état de validation ou résultat récent.
 
 La suppression d’un nœud contenant des descendants doit exiger une confirmation et appliquer une politique explicite d’archivage ou de suppression.
+
+L’organisation transversale complémentaire repose sur des **tags**. Aucun mécanisme parallèle de catégories libres ne doit être introduit pour remplacer les tags. Les types de tests, `requirements`, `business_rules`, profils d’environnement et déclarations d’exécution restent des attributs dédiés parce qu’ils ont une signification opérationnelle.
+
+Les tags doivent pouvoir être ajoutés, retirés et filtrés depuis l’interface par sélection dans une liste administrée. Un utilisateur métier ne doit pas avoir à connaître le fichier qui les définit.
 
 ### EF-003 — Configuration des LLM
 
@@ -291,6 +429,9 @@ Le système doit transformer le dialogue en une représentation structurée cont
 
 - un identifiant stable ;
 - un titre et une description synthétique ;
+- le jeu de tests et le chemin hiérarchique ;
+- le type de test ;
+- les attributs `requirements` et `business_rules` ;
 - les préconditions ;
 - les données de test ;
 - une suite ordonnée d’actions ;
@@ -298,9 +439,58 @@ Le système doit transformer le dialogue en une représentation structurée cont
 - les postconditions ;
 - les tags ;
 - les hypothèses et ambiguïtés restantes ;
+- la déclaration d’exécution CI ;
+- les seuils et mesures attendus pour un test de type `performance` ;
 - la politique d’usage exceptionnel du LLM d’exécution.
 
 Cette représentation est la source de vérité de la génération. Le code ne doit pas être généré directement à partir d’un historique de conversation non validé.
+
+Les attributs `requirements` et `business_rules` sont des listes simples de références ou de libellés courts, saisies comme des lignes ou des éléments sélectionnables. Ils sont facultatifs, ordonnés, sans structure imbriquée et sans secret. Une valeur vide est refusée ; une référence peut être contrôlée par une configuration administrateur, mais un texte métier court reste autorisé lorsque le référentiel externe n’est pas disponible.
+
+### EF-007.1 — Préconditions exprimées en langage métier
+
+L’utilisateur saisit les préconditions sous forme de texte métier, par exemple : « un client actif possède déjà un panier contenant un produit disponible ».
+
+Le LLM de conception peut proposer une traduction structurée, mais l’utilisateur doit pouvoir la corriger et la confirmer. L’application transforme ensuite cette expression confirmée en :
+
+- préconditions vérifiables ;
+- fixtures ou jeux de données requis ;
+- dépendances techniques traitées par du code ;
+- actions de préparation et de nettoyage.
+
+Le code généré doit porter la traduction confirmée. Il ne doit pas déduire silencieusement une dépendance à partir d’une phrase ambiguë.
+
+Les vérifications système suivantes restent obligatoires avant l’exécution :
+
+- existence et validité du profil d’environnement ;
+- accessibilité de la cible autorisée ;
+- disponibilité des données et fixtures requises ;
+- présence des secrets référencés, sans en afficher la valeur ;
+- disponibilité du navigateur et des dépendances du runner ;
+- respect des limites de durée, ressources et réseau.
+
+Le LLM peut expliquer une erreur, proposer une formulation ou suggérer une correction de la définition. Il ne peut pas déclarer une vérification système réussie et ne peut pas contourner un contrôle échoué.
+
+### EF-007.2 — Jeux de données et profils d’environnement
+
+Un test peut référencer plusieurs jeux de données et profils d’environnement sans contenir de secret. L’utilisateur les sélectionne par des libellés métier et non par un chemin de fichier.
+
+L’application doit permettre de :
+
+- choisir un jeu de données existant ;
+- demander au LLM de proposer les données manquantes ;
+- déclarer une donnée comme sensible sans afficher sa valeur ;
+- sélectionner un environnement autorisé ;
+- vérifier que les préconditions et dépendances peuvent être satisfaites ;
+- produire dans le bundle les fixtures non secrètes et leurs identifiants.
+
+Les administrateurs définissent les profils techniques, les sources et les règles de substitution dans la configuration. Un environnement possède un identifiant, un libellé, une URL cible, des origines autorisées et des références de secrets. Un profil de données possède un identifiant, un libellé, une source de fixtures et des règles de préparation/nettoyage. L’utilisateur métier ne voit que les champs et libellés nécessaires à son choix.
+
+### EF-007.3 — Modèles de tests
+
+L’application doit proposer une liste de modèles de tests configurable par les administrateurs. Chaque modèle fournit un nom, une description métier, un type par défaut, des champs obligatoires et une liste de questions de clarification.
+
+Le LLM de conception peut utiliser le modèle sélectionné pour poser les questions pertinentes et ne doit pas demander les informations déjà renseignées. L’utilisateur peut changer de modèle avant validation, avec affichage des champs qui seront ajoutés ou perdus.
 
 ### EF-008 — Validation humaine et versionnement
 
@@ -359,6 +549,10 @@ L’exploration ou l’exécution doit s’arrêter proprement lorsque :
 
 Le système doit expliquer le blocage plutôt que d’inventer une réussite.
 
+### 6.2 Exécution des tests et historisation
+
+Cette partie décrit les fonctions du runner et de la CI. Elle utilise uniquement un bundle de code généré ou personnalisé, versionné et approuvé. Elle ne dépend pas de l’interface de conception.
+
 ### EF-012 — Génération et personnalisation du code
 
 Le MVP génère des tests **Playwright en Python**.
@@ -375,6 +569,8 @@ Le code généré doit :
 - factoriser les comportements réellement partagés sans surarchitecture ;
 - rester lisible et modifiable manuellement ;
 - conserver les personnalisations identifiées lors d’une régénération ou signaler explicitement les conflits.
+
+Pour un test `performance`, le code doit mesurer uniquement les actions et seuils déclarés. Le MVP ne génère pas de trafic concurrent ni de test de charge.
 
 Une personnalisation produit un nouvel artefact candidat. Elle ne peut être exportée comme version approuvée ni exécutée en CI sous l’identité de la version précédente avant une nouvelle exécution individuelle réussie et une nouvelle approbation de son empreinte.
 
@@ -424,6 +620,8 @@ Le runner doit pouvoir lancer :
 - une sélection par tags ;
 - l’ensemble du projet.
 
+Il doit accepter une déclaration de sélection (`--declaration`) et ne retenir que les tests actifs dont l’attribut correspond à cette déclaration. En l’absence de déclaration, la valeur `manual` est utilisée.
+
 Il doit accepter sa configuration par arguments, variables d’environnement et fichier versionnable sans secrets. Il doit produire :
 
 - un code de sortie nul en cas de réussite, non nul en cas d’échec ou d’erreur ;
@@ -433,7 +631,23 @@ Il doit accepter sa configuration par arguments, variables d’environnement et 
 - des captures, vidéos ou traces selon la politique choisie ;
 - la version exacte du test et du code exécutés.
 
+Après chaque exécution, le runner doit produire un rapport détaillé et transmettre au service d’historisation un enregistrement de résultat contenant uniquement :
+
+- la date de l’exécution ;
+- un indicateur de réussite ;
+- la durée mesurée.
+
+L’association technique entre cet enregistrement et le test est portée par la relation de stockage et ne constitue pas un champ de l’historique métier. Le service de conception doit pouvoir importer ces enregistrements et afficher l’historique des réussites et des durées sans charger les fichiers lourds. Les journaux, traces et rapports détaillés restent des artefacts liés à l’exécution, mais ne font pas partie de l’historique synthétique. Une exécution de CI ne doit pas modifier la définition du test.
+
+Pour un test de type `performance`, le rapport détaillé conserve les mesures et les seuils comparés. L’historique synthétique ne conserve que la réussite et la durée. Une mesure dépassant un seuil produit un échec explicite, sans être transformée en simple information.
+
+### EF-015.1 — Déclaration d’exécution du test
+
+Chaque test possède une déclaration simple indiquant quand il peut être sélectionné par une CI, par exemple `on_commit`, `on_merge_request`, `nightly`, `release` ou `manual`. Cette déclaration est un attribut du test, est visible dans le formulaire et peut être utilisée avec les tags pour construire une sélection.
+
 ### EF-016 — Export et intégration Git
+
+Le système doit guider l’utilisateur lors de l’export en lui faisant choisir un jeu de tests, un environnement, une sélection de tags et un format de sortie. Les commandes techniques sont affichées sous forme de commandes prêtes à copier, mais ne sont pas exigées pour définir le test.
 
 Le système doit permettre de produire un paquet versionnable contenant :
 
@@ -446,6 +660,28 @@ Le système doit permettre de produire un paquet versionnable contenant :
 - des modèles GitHub Actions et GitLab CI.
 
 L’écriture directe dans un dépôt Git exige une autorisation dédiée et limitée au dépôt concerné. L’export local et l’exécution CLI doivent rester disponibles sans accès Git distant.
+
+### EF-017 — Catalogue de phrases d’intention fonctionnelle
+
+La conception doit fournir un catalogue de phrases décrivant la diversité des tests fonctionnels. Le catalogue est chargé depuis un fichier de configuration administrable et peut être enrichi sans modification du code.
+
+Le catalogue couvre au minimum :
+
+- accéder à une fonctionnalité ;
+- se connecter, se déconnecter ou expirer une session ;
+- créer, consulter, modifier ou supprimer une donnée ;
+- rechercher, filtrer, trier ou paginer ;
+- saisir, valider, réinitialiser ou abandonner un formulaire ;
+- accepter, refuser ou modifier une opération ;
+- vérifier un message, une notification ou un état ;
+- vérifier une permission ou un rôle ;
+- gérer une erreur, une donnée invalide ou une absence de résultat ;
+- importer, exporter ou télécharger ;
+- effectuer un parcours de commande, paiement ou remboursement ;
+- vérifier une transition d’état métier ;
+- vérifier un seuil de durée pour un test `performance`.
+
+Chaque phrase possède un identifiant, un libellé métier, des exemples, les précisions attendues et le type de test conseillé. Le LLM peut s’appuyer sur ce catalogue pour proposer les questions manquantes et les assertions adaptées. L’utilisateur confirme toujours la phrase retenue et ses paramètres.
 
 ## 7. Exigences de qualité du code de test
 
@@ -585,11 +821,21 @@ L’intégration ne doit pas dépendre d’une API propriétaire de GitHub ou Gi
 
 Les adaptateurs GitHub Actions et GitLab CI sont des modèles de commodité construits sur ce contrat portable.
 
+### ENF-012 — Vérifications système des préconditions
+
+Avant toute exécution, le runner doit effectuer et journaliser un contrôle déterministe de la cible, de l’environnement, des données, des secrets référencés, du navigateur, des ressources et du réseau autorisé. Un contrôle impossible ou échoué doit empêcher l’exécution et produire un résultat explicite.
+
+Ces vérifications système ne peuvent pas être remplacées par une réponse d’un LLM. Le LLM de conception peut seulement aider à formuler la demande, expliquer le résultat ou proposer une modification soumise à validation humaine.
+
 ## 9. Modèle conceptuel
 
 ### Projet
 
-Regroupe une cible, une arborescence, des profils autorisés et une politique de sécurité.
+Regroupe des jeux de tests, une cible, des profils autorisés et une politique de sécurité.
+
+### Jeu de tests
+
+Regroupe un objectif, un type, une cible, une déclaration d’exécution, des tags et une arborescence de tests. Il peut être exporté et exécuté indépendamment.
 
 ### Nœud hiérarchique
 
@@ -609,7 +855,7 @@ Conserve les échanges utiles à l’édition sans devenir la source de vérité
 
 ### Test structuré
 
-Versionne le titre, la description synthétique, les préconditions, données, étapes, assertions, hypothèses, tags et politique d’usage du LLM d’exécution.
+Versionne le titre, la description synthétique, le type, les attributs `requirements` et `business_rules`, les préconditions exprimées par le métier, leur traduction en dépendances exécutables, les jeux de données, le profil d’environnement, les étapes, assertions, hypothèses, tags, déclaration d’exécution et politique d’usage du LLM d’exécution.
 
 ### Version de test
 
@@ -626,6 +872,22 @@ Associe une version de test à du code Playwright généré ou personnalisé, à
 ### Exécution
 
 Associe un artefact immuable à un environnement, un déclencheur, un résultat, des journaux, des rapports et des preuves.
+
+### Historique de résultat
+
+Conserve uniquement, pour chaque résultat, la date, l’indicateur de réussite et la durée. L’association au test est une relation technique de stockage ; elle n’est pas un champ de l’historique métier. Les rapports détaillés, journaux, captures et traces restent des artefacts séparés.
+
+### Journal d’audit du cycle de vie
+
+Conserve séparément les transitions d’état, l’utilisateur, la date et la version concernée. Ce journal ne doit pas être utilisé comme historique synthétique des résultats.
+
+### Modèle de test
+
+Décrit un parcours de saisie guidée avec un type par défaut, des champs obligatoires, des aides, des exemples et des questions utilisées par le LLM de conception.
+
+### Phrase d’intention
+
+Décrit une famille de comportements fonctionnels et les précisions nécessaires à sa transformation en test structuré.
 
 ## 10. Architecture logicielle
 
@@ -720,6 +982,7 @@ sentinelfonctionnelle/
 │   ├── llm/           # Adaptateurs LLM de conception et d’exécution
 │   ├── persistence/   # SQLite puis autres implémentations
 │   ├── artifacts/     # Volume local puis stockage objet
+│   ├── configuration/ # Modèles, phrases, tags et environnements
 │   ├── browser/       # Playwright pour la validation interactive
 │   └── git/           # Export et intégrations Git optionnelles
 ├── web/               # API FastAPI, vues et ressources statiques
@@ -731,7 +994,8 @@ runner/
 ├── selection/         # Résolution suite, dossier, test et tags
 ├── execution/         # Orchestration pytest/Playwright
 ├── adaptive/          # Appel exceptionnel du LLM d’exécution
-└── reporting/         # JUnit, JSON, traces et artefacts
+├── reporting/         # JUnit, JSON, traces et artefacts
+└── history/           # Historique minimal : réussite, durée, date
 ```
 
 Les dépendances pointent vers le domaine et les ports applicatifs. Le domaine ne dépend d’aucun adaptateur.
@@ -760,8 +1024,9 @@ Les dépendances pointent vers le domaine et les ports applicatifs. Le domaine n
 5. Une étape déterministe utilise exclusivement le code approuvé.
 6. Une étape adaptative vérifie d’abord qu’un LLM d’exécution est autorisé par le test et la politique du pipeline.
 7. La réponse du LLM est validée par un schéma fermé avant toute action.
-8. Le runner agrège les résultats et écrit les rapports.
-9. Il termine avec un code de sortie standard sans dépendre du service de conception.
+8. Le runner agrège les résultats et écrit les rapports détaillés.
+9. Il enregistre pour chaque test la réussite, la durée et la date dans l’historique minimal.
+10. Il termine avec un code de sortie standard sans dépendre du service de conception.
 
 ### 10.7 Contrats entre conception et exécution
 
@@ -784,10 +1049,13 @@ Le manifeste indique :
 
 - la version du format ;
 - l’identifiant et la version des tests ;
+- l’identifiant et la version du jeu de tests ;
+- le type de chaque test ;
 - la version du générateur ;
 - les versions Python, pytest et Playwright ;
 - les profils logiques requis, sans secret ;
 - les tags et chemins hiérarchiques ;
+- la déclaration d’exécution de chaque test ;
 - les politiques d’artefacts et d’usage du LLM d’exécution ;
 - une empreinte de chaque fichier et une empreinte globale du bundle ;
 - l’état d’approbation et l’empreinte validée individuellement.
@@ -869,6 +1137,8 @@ jobs:
             --cap-drop=ALL \
             --security-opt=no-new-privileges \
             "$SENTINEL_TARGET_IMAGE"
+          declaration=manual
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then declaration=on_merge_request; fi
           docker run --rm \
             --network=sentinel-ci \
             --user=10001:10001 \
@@ -882,8 +1152,9 @@ jobs:
             -v "$PWD/sentinel-bundle:/bundle:ro" \
             -v "$PWD/artifacts:/artifacts:rw" \
             -e TARGET_BASE_URL \
+            -e SENTINEL_DECLARATION="$declaration" \
             "$SENTINEL_RUNNER_IMAGE" \
-            sentinel-run --bundle /bundle --junit /artifacts/junit.xml
+            sentinel-run --bundle /bundle --declaration "$declaration" --junit /artifacts/junit.xml
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -906,10 +1177,11 @@ sentinel-functional-tests:
     entrypoint: [""]
   variables:
     TARGET_BASE_URL: $SENTINEL_TARGET_BASE_URL
+    SENTINEL_DECLARATION: on_merge_request
   before_script:
     - mkdir -p artifacts
   script:
-    - sentinel-run --bundle ./sentinel-bundle --junit ./artifacts/junit.xml
+    - sentinel-run --bundle ./sentinel-bundle --declaration "$SENTINEL_DECLARATION" --junit ./artifacts/junit.xml
   artifacts:
     when: always
     reports:
@@ -919,6 +1191,8 @@ sentinel-functional-tests:
 ```
 
 L’image garantit que `sentinel-run` est disponible dans le `PATH`. L’`entrypoint` vide rend le contrat explicite pour les runners GitLab qui injectent leur propre script.
+
+Le modèle utilise `on_merge_request` pour un pipeline de merge request. Les jobs `on_commit`, `nightly` et `release` doivent fournir la valeur correspondante dans `SENTINEL_DECLARATION`.
 
 Les variables sensibles utilisent les variables CI/CD masquées et protégées de GitLab et ne sont disponibles que sur les branches ou environnements protégés. Les pipelines de merge requests externes ou non approuvées n’accèdent à aucune variable protégée ni cible sensible. L’exécuteur GitLab doit lui-même être non privilégié, sans montage de socket de runtime, et appliquer les limites de ressources et la politique réseau définies par `ENF-005`.
 
@@ -949,19 +1223,27 @@ Le MVP est livré en deux tranches obligatoires. La première prouve la valeur f
 #### Tranche A — Conception et validation locale
 
 1. une application web mono-instance ;
-2. un projet et plusieurs suites, sous-suites ou dossiers ;
+2. un projet et plusieurs jeux de tests, suites, sous-suites ou dossiers ;
 3. la création, le déplacement et l’ordonnancement de tests dans l’arborescence ;
-4. un profil LLM de conception configurable par endpoint, modèle et secret ;
-5. un profil LLM d’exécution séparé, facultatif et désactivé par défaut ;
-6. un éditeur conversationnel et structuré ;
-7. l’ajout de captures d’écran ;
-8. la mise à jour automatique d’une description synthétique et factuelle ;
-9. la représentation versionnée des préconditions, étapes, données et assertions ;
-10. la génération d’un artefact candidat Playwright en Python ;
-11. le lancement individuel de cet artefact exact dans le runner isolé ;
-12. l’approbation explicite du modèle structuré, du code validé et de leur empreinte ;
-13. la possibilité de personnaliser le code, avec invalidation et nouvelle validation obligatoires ;
-14. une démonstration E2E sur une application cible contrôlée.
+4. les types `smoke`, `sanity`, `acceptance`, `regression`, `e2e` et `performance` ;
+5. le cycle de vie brouillon, en conception, candidat, validé individuellement, approuvé, actif, retiré et archivé ;
+6. un profil LLM de conception configurable par endpoint, modèle et secret ;
+7. un profil LLM d’exécution séparé, facultatif et désactivé par défaut ;
+8. un éditeur conversationnel et structuré sans saisie YAML pour les métiers ;
+9. la documentation de tous les champs du formulaire ;
+10. l’ajout de captures d’écran ;
+11. la mise à jour automatique d’une description synthétique et factuelle ;
+12. les attributs `requirements` et `business_rules` ;
+13. la saisie textuelle des préconditions et leur traduction confirmée en dépendances exécutables ;
+14. les jeux de données et profils d’environnement sélectionnables par libellé ;
+15. la liste administrable des modèles de tests et des phrases d’intention ;
+16. la liste administrable des tags ;
+17. la représentation versionnée des étapes, données et assertions ;
+18. la génération d’un artefact candidat Playwright en Python ;
+19. le lancement individuel de cet artefact exact dans le runner isolé ;
+20. l’approbation explicite du modèle structuré, du code validé et de leur empreinte ;
+21. la possibilité de personnaliser le code, avec invalidation et nouvelle validation obligatoires ;
+22. une démonstration E2E sur une application cible contrôlée.
 
 #### Tranche B — Exécution autonome et CI
 
@@ -972,7 +1254,10 @@ Le MVP est livré en deux tranches obligatoires. La première prouve la valeur f
 5. une image OCI de conception et une image OCI de runner isolé ;
 6. un fichier Compose appliquant les séparations de volumes et de secrets ;
 7. des exemples Docker, Podman, GitHub Actions et GitLab CI ;
-8. une démonstration CI sans secret sur une cible contrôlée.
+8. l’historisation minimale des réussites, durées et dates ;
+9. l’évaluation des seuils de tests `performance` dans les rapports ;
+10. la prise en compte de la déclaration d’exécution du test ;
+11. une démonstration CI sans secret sur une cible contrôlée.
 
 ### 11.3 Usage du LLM dans le MVP
 
@@ -982,7 +1267,13 @@ Le LLM de conception est utilisé pour :
 - proposer des modifications structurées ;
 - synthétiser la description ;
 - suggérer des localisateurs ;
-- générer le code initial.
+- générer le code initial ;
+- proposer des questions à partir d’un modèle de test ;
+- traduire les préconditions textuelles en dépendances candidates ;
+- proposer des jeux de données, types, tags, `requirements` et `business_rules` ;
+- sélectionner des phrases d’intention pertinentes.
+
+Ces propositions restent soumises à la validation du fonctionnel métier. Les vérifications système et l’exécution du code ne sont pas déléguées au LLM de conception.
 
 Le LLM d’exécution :
 
@@ -1043,6 +1334,17 @@ Le MVP est acceptable lorsque les critères suivants sont vérifiés par des tes
 27. Le modèle GitLab CI publie les rapports sans exposer de variable protégée aux merge requests non approuvées.
 28. Une modification manuelle protégée n’est jamais écrasée silencieusement par une régénération.
 29. Le résultat distingue clairement validation de conception et exécution automatisée.
+30. Les champs du formulaire affichent un libellé, une aide, un exemple et une règle de validation.
+31. Un utilisateur métier peut définir un test sans écrire de YAML.
+32. Les modèles de tests, types, tags, phrases d’intention et environnements sont chargés depuis les fichiers de configuration administrables.
+33. Une précondition saisie en texte est transformée en dépendances candidates puis confirmée avant génération du code.
+34. Les vérifications système échouées bloquent l’exécution et ne peuvent pas être contournées par le LLM.
+35. Les attributs `requirements` et `business_rules` sont conservés dans la définition et l’export du test.
+36. Un test de type `performance` compare ses seuils, produit un rapport détaillé et historise sa réussite et sa durée.
+37. L’historique persistant d’un test contient uniquement sa date, sa réussite et sa durée.
+38. La déclaration d’exécution d’un test permet de le sélectionner pour `on_commit`, `on_merge_request`, `nightly`, `release` ou `manual`.
+39. Les transitions de cycle de vie invalides sont refusées et les transitions valides sont inscrites dans le journal d’audit séparé.
+40. Un test retiré ou archivé n’est jamais sélectionné par une CI.
 
 ## 13. Stratégie de validation et de développement
 
@@ -1061,8 +1363,21 @@ Les tests doivent couvrir au minimum :
 
 - le domaine sans LLM ni navigateur réels ;
 - les états et versions du cycle de conception ;
+- les transitions valides et invalides de tous les états, y compris retrait et archivage ;
 - la hiérarchie et les déplacements ;
+- les six types de tests, leur héritage et les incompatibilités ;
 - la synthèse factuelle des descriptions ;
+- les champs obligatoires, aides, exemples, validations et assistance de la saisie guidée ;
+- les attributs simples `requirements` et `business_rules` ;
+- les modèles de tests et leurs questions de clarification ;
+- le catalogue de phrases d’intention et sa configuration ;
+- la validation des fichiers de configuration administrables ;
+- les préconditions textuelles, leur confirmation et la résolution codée des dépendances ;
+- le blocage des contrôles système échoués ;
+- les jeux de données, profils d’environnement et leurs références ;
+- la déclaration de sélection CI et le filtrage par déclaration ;
+- l’historique strictement limité à la date, la réussite et la durée ;
+- les seuils de performance et le type `performance` ;
 - la séparation des profils LLM ;
 - les contrats d’adaptateurs ;
 - les réponses LLM invalides ;
